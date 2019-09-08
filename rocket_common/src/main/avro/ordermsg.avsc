@@ -1,0 +1,11 @@
+{
+    "namespace": "com.mudiyouyou.rocket.msg",
+    "type": "record",
+    "name": "OrderMsg",
+    "fields": [
+        {"name": "id", "type": ["int", "null"]},
+        {"name": "userId", "type": "string"},
+        {"name": "status",  "type": ["int", "null"]},
+        {"name": "amount", "type": ["int", "null"]}
+    ]
+}
