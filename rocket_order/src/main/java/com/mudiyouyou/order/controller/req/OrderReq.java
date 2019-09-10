@@ -1,4 +1,4 @@
-package com.mudiyouyou.controller.req;
+package com.mudiyouyou.order.controller.req;
 
 import lombok.Data;
 

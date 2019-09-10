@@ -1,15 +1,16 @@
-package com.mudiyouyou.controller;
+package com.mudiyouyou.order.service.impl;
 
-import com.mudiyouyou.controller.req.OrderReq;
-import com.mudiyouyou.controller.rsp.OrderRsp;
-import com.mudiyouyou.entity.Order;
-import com.mudiyouyou.entity.OrderExample;
-import com.mudiyouyou.repository.OrderMapper;
+import com.mudiyouyou.order.controller.req.OrderReq;
+import com.mudiyouyou.order.entity.Order;
+import com.mudiyouyou.order.entity.OrderExample;
+import com.mudiyouyou.order.repository.OrderMapper;
 import com.mudiyouyou.rocket.constat.TagConstat;
 import com.mudiyouyou.rocket.constat.TopicConstat;
 import com.mudiyouyou.rocket.exception.RocketCommonException;
-import com.mudiyouyou.rocket.msg.AvroSerializer;
 import com.mudiyouyou.rocket.msg.OrderMsg;
+import com.mudiyouyou.order.service.OrderService;
+import com.mudiyouyou.rocket.msg.AvroSerializer;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.client.producer.*;
 import org.apache.rocketmq.common.message.Message;
@@ -17,17 +18,13 @@ import org.apache.rocketmq.common.message.MessageExt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 
-@RestController
-@RequestMapping("/order")
-public class OrderController implements TransactionListener {
+@Slf4j
+public class OrderServiceImpl implements TransactionListener, OrderService {
     public static final int WAIT_TO_PAY = 1;
     public static final int PAYING = 2;
     private static final int PAID = 3;
@@ -37,46 +34,37 @@ public class OrderController implements TransactionListener {
     @Autowired
     private TransactionMQProducer producer;
 
-    @GetMapping("/apply")
-    public OrderRsp apply(OrderReq req) {
+    @Transactional(propagation = Propagation.REQUIRED)
+    @Override
+    public void apply(OrderReq req) throws RocketCommonException {
         // 产生订单状态为待支付
-        Order entity = new Order();
-        entity.setAmount(req.getAmount());
-        entity.setStatus(WAIT_TO_PAY);
-        entity.setUserId(req.getUserId());
-        boolean fail = orderMapper.insert(entity) <= 0;
-        if (fail) {
-            OrderRsp rsp = new OrderRsp();
-            rsp.setCode(0);
-            rsp.setDesc("下单失败");
-            return rsp;
+        try {
+            Order entity = new Order();
+            entity.setAmount(req.getAmount());
+            entity.setStatus(WAIT_TO_PAY);
+            entity.setUserId(req.getUserId());
+            boolean fail = orderMapper.insert(entity) <= 0;
+            if (fail) {
+                throw new RocketCommonException("下单失败");
+            }
+        }catch (Exception e){
+            log.error("支付申请失败", e);
+            throw new RocketCommonException("下单失败",e);
         }
-        OrderRsp rsp = new OrderRsp();
-        rsp.setCode(1);
-        return rsp;
-
     }
 
+    @Override
     @Transactional(propagation = Propagation.REQUIRED)
-    @GetMapping("/pay")
-    public OrderRsp pay(OrderReq req) throws RocketCommonException {
+    public void pay(OrderReq req) throws RocketCommonException {
         // 发送订单支付中消息
         try {
-            TransactionSendResult result = sendMsg(req,PAYING);
+            TransactionSendResult result = sendMsg(req, PAYING);
             if (!result.getSendStatus().equals(SendStatus.SEND_OK)) {
-                OrderRsp rsp = new OrderRsp();
-                rsp.setCode(0);
-                rsp.setDesc("支付申请失败");
-                return rsp;
+                throw new RocketCommonException("支付申请失败");
             }
-            OrderRsp rsp = new OrderRsp();
-            rsp.setCode(1);
-            return rsp;
         } catch (Exception e) {
-            OrderRsp rsp = new OrderRsp();
-            rsp.setCode(0);
-            rsp.setDesc(e.getMessage());
-            return rsp;
+            log.error("支付申请失败", e);
+            throw new RocketCommonException("支付申请失败");
         }
     }
 
@@ -92,7 +80,7 @@ public class OrderController implements TransactionListener {
         }
     }
 
-    private TransactionSendResult sendMsg(OrderReq req,int status) throws RocketCommonException, MQClientException, IOException {
+    private TransactionSendResult sendMsg(OrderReq req, int status) throws RocketCommonException, MQClientException, IOException {
         Order now = getOrder(req.getId());
         OrderMsg orderMsg = OrderMsg.newBuilder()
                 .setId(now.getId())
@@ -115,25 +103,17 @@ public class OrderController implements TransactionListener {
         throw new RocketCommonException("未找到此订单");
     }
 
-    @GetMapping("/payCallback")
-    public OrderRsp payCallback(OrderReq req) {
+    @Override
+    public void payCallback(OrderReq req) throws RocketCommonException {
         // 发送订单已支付消息
         try {
             TransactionSendResult result = sendMsg(req, PAID);
             if (!result.getSendStatus().equals(SendStatus.SEND_OK)) {
-                OrderRsp rsp = new OrderRsp();
-                rsp.setCode(0);
-                rsp.setDesc("支付回调失败");
-                return rsp;
+                throw new RocketCommonException("支付回调失败");
             }
-            OrderRsp rsp = new OrderRsp();
-            rsp.setCode(1);
-            return rsp;
         } catch (Exception e) {
-            OrderRsp rsp = new OrderRsp();
-            rsp.setCode(0);
-            rsp.setDesc(e.getMessage());
-            return rsp;
+            log.error("支付回调失败", e);
+            throw new RocketCommonException("支付回调失败");
         }
     }
 

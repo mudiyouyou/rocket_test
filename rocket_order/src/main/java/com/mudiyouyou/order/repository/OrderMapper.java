@@ -1,7 +1,7 @@
-package com.mudiyouyou.repository;
+package com.mudiyouyou.order.repository;
 
-import com.mudiyouyou.entity.Order;
-import com.mudiyouyou.entity.OrderExample;
+import com.mudiyouyou.order.entity.Order;
+import com.mudiyouyou.order.entity.OrderExample;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
 

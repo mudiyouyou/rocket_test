@@ -8,4 +8,8 @@ public class RocketCommonException extends Exception {
     public RocketCommonException(String message) {
         super(message);
     }
+
+    public RocketCommonException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

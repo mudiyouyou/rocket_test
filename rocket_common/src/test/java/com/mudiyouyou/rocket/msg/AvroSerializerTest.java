@@ -16,6 +16,7 @@ public class AvroSerializerTest {
                 .build();
         byte[] raw = serializer.serialize(obj);
         OrderMsg source = serializer.unserialize(raw, obj.getSchema());
+        System.out.println(source.getAmount());
         Assert.assertEquals(source,obj);
     }
 }
