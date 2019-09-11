@@ -24,7 +24,7 @@ public class CreditServiceImpl implements CreditService {
     @Override
     public void consumerPayingOrderMsg(OrderMsg orderMsg) throws RocketCommonException {
         CreditExample selectByUserId = new CreditExample();
-        selectByUserId.createCriteria().andUserIdEqualTo((String) orderMsg.getUserId());
+        selectByUserId.createCriteria().andUserIdEqualTo(orderMsg.getUserId().toString());
         List<Credit> credits = creditMapper.selectByExample(selectByUserId);
         Iterator<Credit> it = credits.iterator();
         if (it.hasNext()) {
@@ -43,7 +43,7 @@ public class CreditServiceImpl implements CreditService {
     @Override
     public void consumerPaidOrderMsg(OrderMsg orderMsg) throws RocketCommonException {
         CreditExample selectByUserId = new CreditExample();
-        selectByUserId.createCriteria().andUserIdEqualTo((String) orderMsg.getUserId());
+        selectByUserId.createCriteria().andUserIdEqualTo(orderMsg.getUserId().toString());
         List<Credit> credits = creditMapper.selectByExample(selectByUserId);
         Iterator<Credit> it = credits.iterator();
         if (it.hasNext()) {

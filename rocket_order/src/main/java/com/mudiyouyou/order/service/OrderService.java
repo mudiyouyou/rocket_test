@@ -6,7 +6,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 public interface OrderService {
-    void apply(OrderReq req) throws RocketCommonException;
+    Integer apply(OrderReq req) throws RocketCommonException;
 
     @Transactional(propagation = Propagation.REQUIRED)
     void pay(OrderReq req) throws RocketCommonException;

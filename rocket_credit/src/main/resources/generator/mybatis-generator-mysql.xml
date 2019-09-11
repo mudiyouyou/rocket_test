@@ -33,6 +33,7 @@
 
         <table schema="test" tableName="rocket_credit" enableCountByExample="true" enableDeleteByExample="false"
                enableSelectByExample="true" enableUpdateByExample="true" domainObjectName="Credit">
+            <generatedKey column="id" sqlStatement="SELECT LAST_INSERT_ID()"/>
         </table>
     </context>
 </generatorConfiguration>

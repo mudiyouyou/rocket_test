@@ -52,24 +52,24 @@ public class CreditMain {
         consumer.subscribe(topic, "*");
         AvroSerializer<OrderMsg> serializer = new AvroSerializer<>();
         consumer.registerMessageListener((MessageListenerConcurrently) (msgs, context) -> {
-//            CreditService creditService = creditService();
-//            for (MessageExt msg : msgs) {
-//                try {
-//                    OrderMsg orderMsg = serializer.unserialize(msg.getBody(), OrderMsg.getClassSchema());
-//                    log.info("接收订单消息:" + JSON.toJSONString(orderMsg));
-//                    if (msg.getTags().equals(TagConstat.ORDER_PAYING)) {
-//                        creditService.consumerPayingOrderMsg(orderMsg);
-//                    }
-//                    if (msg.getTags().equals(TagConstat.ORDER_PAID)) {
-//                        creditService.consumerPaidOrderMsg(orderMsg);
-//                    }
-//                } catch (Exception e) {
-//                    log.error("消费订单消息错误",e);
-//                    context.setAckIndex(msg.getQueueId());
-//                    context.setDelayLevelWhenNextConsume(1);
-//                    return ConsumeConcurrentlyStatus.RECONSUME_LATER;
-//                }
-//            }
+            CreditService creditService = creditService();
+            for (MessageExt msg : msgs) {
+                try {
+                    OrderMsg orderMsg = serializer.unserialize(msg.getBody(), OrderMsg.getClassSchema());
+                    log.info("接收订单消息:" + orderMsg.getId());
+                    if (msg.getTags().equals(TagConstat.ORDER_PAYING)) {
+                        creditService.consumerPayingOrderMsg(orderMsg);
+                    }
+                    if (msg.getTags().equals(TagConstat.ORDER_PAID)) {
+                        creditService.consumerPaidOrderMsg(orderMsg);
+                    }
+                } catch (Exception e) {
+                    log.error("消费订单消息错误", e);
+                    context.setAckIndex(msg.getQueueId());
+                    context.setDelayLevelWhenNextConsume(1);
+                    return ConsumeConcurrentlyStatus.RECONSUME_LATER;
+                }
+            }
             return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
         });
         consumer.start();

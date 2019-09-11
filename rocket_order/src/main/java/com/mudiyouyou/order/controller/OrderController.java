@@ -4,6 +4,7 @@ import com.mudiyouyou.order.controller.req.OrderReq;
 import com.mudiyouyou.order.controller.rsp.OrderRsp;
 import com.mudiyouyou.order.service.OrderService;
 import lombok.extern.slf4j.Slf4j;
+import org.codehaus.jackson.annotate.JsonTypeInfo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,9 +24,10 @@ public class OrderController{
     public OrderRsp apply(@RequestBody OrderReq req) {
         // 产生订单状态为待支付
         try {
-            orderService.apply(req);
+            Integer id = orderService.apply(req);
             OrderRsp rsp = new OrderRsp();
             rsp.setCode(1);
+            rsp.setId(id);
             return rsp;
         } catch (Exception e) {
             OrderRsp rsp = new OrderRsp();

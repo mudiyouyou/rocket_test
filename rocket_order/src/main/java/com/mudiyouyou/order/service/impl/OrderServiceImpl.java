@@ -19,7 +19,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 
@@ -34,9 +33,11 @@ public class OrderServiceImpl implements TransactionListener, OrderService {
     @Autowired
     private TransactionMQProducer producer;
 
+    private AvroSerializer<OrderMsg> avroSerializer = new AvroSerializer<>();
+
     @Transactional(propagation = Propagation.REQUIRED)
     @Override
-    public void apply(OrderReq req) throws RocketCommonException {
+    public Integer apply(OrderReq req) throws RocketCommonException {
         // 产生订单状态为待支付
         try {
             Order entity = new Order();
@@ -47,9 +48,10 @@ public class OrderServiceImpl implements TransactionListener, OrderService {
             if (fail) {
                 throw new RocketCommonException("下单失败");
             }
-        }catch (Exception e){
+            return entity.getId();
+        } catch (Exception e) {
             log.error("支付申请失败", e);
-            throw new RocketCommonException("下单失败",e);
+            throw new RocketCommonException("下单失败", e);
         }
     }
 
@@ -58,7 +60,8 @@ public class OrderServiceImpl implements TransactionListener, OrderService {
     public void pay(OrderReq req) throws RocketCommonException {
         // 发送订单支付中消息
         try {
-            TransactionSendResult result = sendMsg(req, PAYING);
+            Order now = getOrder(req.getId(),WAIT_TO_PAY);
+            TransactionSendResult result = sendMsg(now, PAYING);
             if (!result.getSendStatus().equals(SendStatus.SEND_OK)) {
                 throw new RocketCommonException("支付申请失败");
             }
@@ -68,7 +71,7 @@ public class OrderServiceImpl implements TransactionListener, OrderService {
         }
     }
 
-    private void changeStatus(OrderReq req, int status) throws RocketCommonException {
+    private void changeStatus(Order req, int status) throws RocketCommonException {
         // 修改支付订单为支付中
         Order toUpdate = new Order();
         toUpdate.setId(req.getId());
@@ -80,21 +83,33 @@ public class OrderServiceImpl implements TransactionListener, OrderService {
         }
     }
 
-    private TransactionSendResult sendMsg(OrderReq req, int status) throws RocketCommonException, MQClientException, IOException {
-        Order now = getOrder(req.getId());
+    private TransactionSendResult sendMsg(Order now, int status) throws RocketCommonException, MQClientException {
         OrderMsg orderMsg = OrderMsg.newBuilder()
                 .setId(now.getId())
                 .setUserId(now.getUserId())
-                .setStatus(PAYING)
+                .setStatus(status)
                 .setAmount(now.getAmount())
                 .build();
-        Message msg = new Message(TopicConstat.ORDER_STATUS_CHANGING, TagConstat.ORDER_PAYING, req.getId().toString(), orderMsg.toByteBuffer().array());
-        return producer.sendMessageInTransaction(msg, req);
+        byte[] body = avroSerializer.serialize(orderMsg);
+        String tag = null;
+        if (PAYING == status) {
+            tag = TagConstat.ORDER_PAYING;
+        }
+        if (PAID == status) {
+            tag = TagConstat.ORDER_PAID;
+        }
+        if (tag == null) {
+            throw new RocketCommonException("不支持该类型消息");
+        }
+        Message msg = new Message(TopicConstat.ORDER_STATUS_CHANGING, tag, now.getId().toString(), body);
+        return producer.sendMessageInTransaction(msg, now);
     }
 
-    private Order getOrder(Integer id) throws RocketCommonException {
+    private Order getOrder(Integer id,int status) throws RocketCommonException {
         OrderExample example = new OrderExample();
-        example.createCriteria().andIdEqualTo(id);
+        example.createCriteria()
+                .andStatusEqualTo(status)
+                .andIdEqualTo(id);
         List<Order> list = orderMapper.selectByExample(example);
         Iterator<Order> it = list.iterator();
         if (it.hasNext()) {
@@ -107,7 +122,8 @@ public class OrderServiceImpl implements TransactionListener, OrderService {
     public void payCallback(OrderReq req) throws RocketCommonException {
         // 发送订单已支付消息
         try {
-            TransactionSendResult result = sendMsg(req, PAID);
+            Order now = getOrder(req.getId(),PAYING);
+            TransactionSendResult result = sendMsg(now, PAID);
             if (!result.getSendStatus().equals(SendStatus.SEND_OK)) {
                 throw new RocketCommonException("支付回调失败");
             }
@@ -130,7 +146,7 @@ public class OrderServiceImpl implements TransactionListener, OrderService {
 
     @Override
     public LocalTransactionState executeLocalTransaction(Message msg, Object arg) {
-        OrderReq req = (OrderReq) arg;
+        Order req = (Order) arg;
         try {
             if (TagConstat.ORDER_PAYING.equals(msg.getTags())) {
                 changeStatus(req, PAYING);
